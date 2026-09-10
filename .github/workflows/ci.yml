@@ -7,9 +7,11 @@ on:
       - 'gems/**'
       - 'schemas/**'
       - 'scripts/**'
+      - '.github/workflows/**'
       - 'requirements.txt'
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   validate-and-build:
