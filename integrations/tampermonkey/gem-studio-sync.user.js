@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         GemStudio Sync for Gemini
 // @namespace    https://github.com/rmasabela/gem-studio
-// @version      1.0.0
+// @version      1.0.2
 // @description  Sincroniza y despliega configuraciones de Gems desde GitHub Pages directo a la UI de Gemini
 // @author       Ricardo Masabel
-// @match        https://gemini.google.com/gems/*
+// @match        https://gemini.google.com/*
 // @grant        GM_xmlhttpRequest
 // @connect      rmasabela.github.io
+// @run-at       document-idle
 // ==/UserScript==
 
 (function() {
@@ -14,52 +15,99 @@
 
     const BASE_URL = "https://rmasabela.github.io/gem-studio";
 
-    function triggerInput(el, text) {
-        if (!el) return;
-        el.focus();
-        if (el.tagName.toLowerCase() === 'textarea' || el.tagName.toLowerCase() === 'input') {
-            el.value = text;
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-        } else if (el.isContentEditable) {
-            // Manejo de div contenteditable moderno
-            el.innerHTML = '';
-            document.execCommand('insertText', false, text);
-            el.dispatchEvent(new Event('input', { bubbles: true }));
+    function setNativeValue(element, value) {
+        if (!element) return;
+        element.focus();
+        
+        // Manejo para inputs/textareas que pueden tener value setters interceptados por Angular/React
+        const valueSetter = Object.getOwnPropertyDescriptor(element, 'value')?.set;
+        const prototype = Object.getPrototypeOf(element);
+        const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+
+        if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {
+            prototypeValueSetter.call(element, value);
+        } else if (valueSetter) {
+            valueSetter.call(element, value);
+        } else {
+            element.value = value;
         }
+
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        element.dispatchEvent(new Event('change', { bubbles: true }));
+        element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+        element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+    }
+
+    function locateGemFields() {
+        const textareas = Array.from(document.querySelectorAll('textarea'));
+        const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+
+        // 1. Campo Nombre
+        let nameField = inputs.find(i => {
+            const label = (i.getAttribute('aria-label') || i.getAttribute('placeholder') || '').toLowerCase();
+            return label.includes('nombre') || label.includes('name');
+        }) || inputs[0];
+
+        // 2. Campo Descripción
+        let descField = inputs.find(i => {
+            const label = (i.getAttribute('aria-label') || i.getAttribute('placeholder') || '').toLowerCase();
+            return label.includes('descrip');
+        }) || textareas.find(t => {
+            const label = (t.getAttribute('aria-label') || t.getAttribute('placeholder') || '').toLowerCase();
+            return label.includes('descrip');
+        });
+
+        // 3. Campo Instrucciones (usualmente el textarea principal o más grande)
+        let instField = textareas.find(t => {
+            const label = (t.getAttribute('aria-label') || t.getAttribute('placeholder') || '').toLowerCase();
+            return label.includes('instrucc') || label.includes('instruction');
+        }) || textareas[textareas.length - 1];
+
+        return { nameField, descField, instField };
     }
 
     function renderSyncBar() {
-        if (document.getElementById('gem-studio-sync-bar')) return;
+        // Inyectar solo si estamos en la vista de edición/creación de un Gem
+        const isEditView = window.location.pathname.includes('/gems/edit/') || 
+                           window.location.pathname.includes('/gems/create') ||
+                           window.location.href.includes('/gems/');
 
-        // Solo inyectar si estamos en el panel de creación/edición de Gems
-        const isGemEditor = window.location.pathname.includes('/gems/');
-        if (!isGemEditor) return;
+        const existingBar = document.getElementById('gem-studio-sync-bar');
+
+        if (!isEditView) {
+            if (existingBar) existingBar.style.display = 'none';
+            return;
+        }
+
+        if (existingBar) {
+            existingBar.style.display = 'flex';
+            return;
+        }
 
         const bar = document.createElement('div');
         bar.id = 'gem-studio-sync-bar';
         bar.style.cssText = `
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            z-index: 99999;
-            background: #181a1f;
-            border: 1px solid #3c4043;
-            border-radius: 8px;
-            padding: 10px 14px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.6);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            position: fixed !important;
+            bottom: 24px !important;
+            right: 24px !important;
+            z-index: 2147483647 !important;
+            background: #181a1f !important;
+            border: 1px solid #3c4043 !important;
+            border-radius: 8px !important;
+            padding: 8px 12px !important;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.7) !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 8px !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
         `;
 
         bar.innerHTML = `
-            <span style="color: #8ab4f8; font-weight: 600; font-size: 12px; letter-spacing: 0.5px;">GEM-STUDIO</span>
-            <select id="gem-studio-select" style="background: #202124; color: #e8eaed; border: 1px solid #5f6368; border-radius: 4px; padding: 4px 8px; font-size: 12px; outline: none;">
+            <span style="color: #8ab4f8; font-weight: 600; font-size: 11px; letter-spacing: 0.5px;">GEM-STUDIO</span>
+            <select id="gem-studio-select" style="background: #202124; color: #e8eaed; border: 1px solid #5f6368; border-radius: 4px; padding: 4px 6px; font-size: 11px; outline: none;">
                 <option value="">Cargando catálogo...</option>
             </select>
-            <button id="gem-studio-btn-sync" style="background: #1a73e8; color: white; border: none; border-radius: 4px; padding: 5px 12px; font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.2s;">
+            <button id="gem-studio-btn-sync" style="background: #1a73e8; color: white; border: none; border-radius: 4px; padding: 5px 10px; font-size: 11px; font-weight: 500; cursor: pointer;">
                 Deploy to UI
             </button>
         `;
@@ -69,7 +117,7 @@
         const selectEl = document.getElementById('gem-studio-select');
         const syncBtn = document.getElementById('gem-studio-btn-sync');
 
-        // 1. Cargar catálogo centralizado index.json
+        // Cargar catálogo de GitHub Pages
         GM_xmlhttpRequest({
             method: "GET",
             url: `${BASE_URL}/index.json`,
@@ -79,20 +127,19 @@
                         const gems = JSON.parse(res.responseText);
                         selectEl.innerHTML = gems.map(g => `<option value="${g.slug}">${g.name} (v${g.version})</option>`).join('');
                     } catch(e) {
-                        selectEl.innerHTML = '<option value="">Error parseando catálogo</option>';
+                        selectEl.innerHTML = '<option value="">Error JSON</option>';
                     }
                 } else {
-                    selectEl.innerHTML = '<option value="">Error cargando catálogo</option>';
+                    selectEl.innerHTML = '<option value="">Error ' + res.status + '</option>';
                 }
             }
         });
 
-        // 2. Acción de deploy al presionar el botón
         syncBtn.addEventListener('click', () => {
             const slug = selectEl.value;
-            if (!slug) return alert('Selecciona un Gem válido.');
+            if (!slug) return alert('Selecciona un Gem.');
 
-            syncBtn.innerText = 'Sincronizando...';
+            syncBtn.innerText = 'Descargando...';
             syncBtn.style.background = '#e37400';
 
             GM_xmlhttpRequest({
@@ -102,47 +149,23 @@
                     if (res.status !== 200) {
                         syncBtn.innerText = 'Error';
                         syncBtn.style.background = '#d93025';
-                        alert(`No se pudo descargar el Gem ${slug}: status ${res.status}`);
-                        return;
+                        return alert(`HTTP Error ${res.status}`);
                     }
 
                     try {
-                        const payload = JSON.parse(res.responseText).gem_configuration;
+                        const config = JSON.parse(res.responseText).gem_configuration;
+                        const { nameField, descField, instField } = locateGemFields();
 
-                        // Localización de campos estándar en el formulario de Gemini
-                        const inputs = Array.from(document.querySelectorAll('input, textarea, div[contenteditable="true"]'));
-
-                        // Input Nombre
-                        const nameInput = inputs.find(el => {
-                            const aria = (el.getAttribute('aria-label') || '').toLowerCase();
-                            const ph = (el.getAttribute('placeholder') || '').toLowerCase();
-                            return aria.includes('nombre') || ph.includes('nombre') || aria.includes('name') || ph.includes('name');
-                        });
-
-                        // Input Descripción
-                        const descInput = inputs.find(el => {
-                            const aria = (el.getAttribute('aria-label') || '').toLowerCase();
-                            const ph = (el.getAttribute('placeholder') || '').toLowerCase();
-                            return (aria.includes('descrip') || ph.includes('descrip')) && el !== nameInput;
-                        });
-
-                        // Input Instrucciones
-                        const instInput = inputs.find(el => {
-                            const aria = (el.getAttribute('aria-label') || '').toLowerCase();
-                            const ph = (el.getAttribute('placeholder') || '').toLowerCase();
-                            return aria.includes('instrucc') || ph.includes('instrucc') || aria.includes('instruction') || ph.includes('instruction');
-                        });
-
-                        if (nameInput && payload.metadata?.name) {
-                            triggerInput(nameInput, payload.metadata.name);
+                        if (nameField && config.metadata?.name) {
+                            setNativeValue(nameField, config.metadata.name);
                         }
 
-                        if (descInput && payload.metadata?.description) {
-                            triggerInput(descInput, payload.metadata.description);
+                        if (descField && config.metadata?.description) {
+                            setNativeValue(descField, config.metadata.description);
                         }
 
-                        if (instInput && payload.behavior?.instructions) {
-                            triggerInput(instInput, payload.behavior.instructions);
+                        if (instField && config.behavior?.instructions) {
+                            setNativeValue(instField, config.behavior.instructions);
                         }
 
                         syncBtn.innerText = '¡Desplegado!';
@@ -155,13 +178,12 @@
                     } catch (err) {
                         syncBtn.innerText = 'Error';
                         syncBtn.style.background = '#d93025';
-                        alert('Error al procesar el manifiesto: ' + err.message);
+                        alert('Error aplicando datos: ' + err.message);
                     }
                 }
             });
         });
     }
 
-    // Monitor activo para inyectar al navegar mediante SPA
-    setInterval(renderSyncBar, 1500);
+    setInterval(renderSyncBar, 1000);
 })();
