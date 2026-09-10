@@ -1,0 +1,13 @@
+# Distributables / Compilados locales
+dist/
+
+# Entornos virtuales y dependencias Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# IDEs y SO
+.DS_Store
+.vscode/
+.idea/
