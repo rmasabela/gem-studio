@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GemStudio Sync for Gemini
 // @namespace    https://github.com/rmasabela/gem-studio
-// @version      1.0.3
+// @version      1.0.4
 // @description  Sincroniza y despliega configuraciones de Gems desde GitHub Pages directo a la UI de Gemini
 // @author       Ricardo Masabel
 // @match        https://gemini.google.com/*
@@ -15,24 +15,44 @@
 
     const BASE_URL = "https://rmasabela.github.io/gem-studio";
 
-    function setNativeValue(element, value) {
+    function setFieldValue(element, value) {
         if (!element) return;
         element.focus();
 
-        const valueSetter = Object.getOwnPropertyDescriptor(element, 'value')?.set;
-        const prototype = Object.getPrototypeOf(element);
-        const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+        if (element.isContentEditable) {
+            element.focus();
+            // Seleccionar todo el contenido previo para sobreescribirlo limpiamente
+            const selection = window.getSelection();
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            selection.removeAllRanges();
+            selection.addRange(range);
 
-        if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {
-            prototypeValueSetter.call(element, value);
-        } else if (valueSetter) {
-            valueSetter.call(element, value);
+            // Inserción nativa para editores reactivos
+            const success = document.execCommand('insertText', false, value);
+            if (!success || element.innerText.trim() === '') {
+                element.innerText = value;
+            }
+
+            element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
         } else {
-            element.value = value;
+            const valueSetter = Object.getOwnPropertyDescriptor(element, 'value')?.set;
+            const prototype = Object.getPrototypeOf(element);
+            const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+
+            if (prototypeValueSetter && valueSetter !== prototypeValueSetter) {
+                prototypeValueSetter.call(element, value);
+            } else if (valueSetter) {
+                valueSetter.call(element, value);
+            } else {
+                element.value = value;
+            }
+
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            element.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-        element.dispatchEvent(new Event('change', { bubbles: true }));
         element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
         element.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
     }
@@ -40,30 +60,25 @@
     function locateGemFields() {
         const textareas = Array.from(document.querySelectorAll('textarea'));
         const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])'));
+        const editables = Array.from(document.querySelectorAll('div[contenteditable="true"]'));
 
-        // 1. Nombre: Input con placeholder o label correspondiente
+        // 1. Campo Nombre (input)
         let nameField = inputs.find(el => {
-            const str = (el.placeholder + ' ' + el.getAttribute('aria-label') + ' ' + el.name).toLowerCase();
+            const str = (el.placeholder + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
             return str.includes('nombre') || str.includes('name') || str.includes('asigna un nombre');
         }) || inputs[0];
 
-        // 2. Descripción: Textarea con placeholder específico o primer textarea
+        // 2. Campo Descripción (textarea con placeholder "Describe tu Gem")
         let descField = textareas.find(el => {
-            const str = (el.placeholder + ' ' + el.getAttribute('aria-label')).toLowerCase();
-            return str.includes('describe tu gem') || str.includes('descrip');
-        });
+            const str = (el.placeholder + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
+            return str.includes('describe') || str.includes('descrip');
+        }) || textareas[0];
 
-        // 3. Instrucciones: Textarea cuyo placeholder contiene 'ejemplo:' o 'horticultor', o el textarea más extenso
-        let instField = textareas.find(el => {
-            const str = (el.placeholder + ' ' + el.getAttribute('aria-label')).toLowerCase();
-            return str.includes('ejemplo:') || str.includes('horticultor') || str.includes('instrucc') || str.includes('instruction');
-        });
-
-        // Fallback estructural si Google cambia los placeholders pero mantiene el orden vertical
-        if (textareas.length >= 2) {
-            if (!descField) descField = textareas[0];
-            if (!instField) instField = textareas[1];
-        }
+        // 3. Campo Instrucciones (div contenteditable o textarea con placeholder "Ejemplo:")
+        let instField = editables.find(el => {
+            const str = (el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.innerText || '').toLowerCase();
+            return str.includes('ejemplo') || str.includes('horticultor') || str.includes('instrucc');
+        }) || editables[0] || textareas.find(el => el !== descField);
 
         return { nameField, descField, instField };
     }
@@ -157,15 +172,15 @@
                         const { nameField, descField, instField } = locateGemFields();
 
                         if (nameField && config.metadata?.name) {
-                            setNativeValue(nameField, config.metadata.name);
+                            setFieldValue(nameField, config.metadata.name);
                         }
 
                         if (descField && config.metadata?.description) {
-                            setNativeValue(descField, config.metadata.description);
+                            setFieldValue(descField, config.metadata.description);
                         }
 
                         if (instField && config.behavior?.instructions) {
-                            setNativeValue(instField, config.behavior.instructions);
+                            setFieldValue(instField, config.behavior.instructions);
                         }
 
                         syncBtn.innerText = '¡Desplegado!';
