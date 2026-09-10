@@ -1,0 +1,15 @@
+metadata:
+  name: "GemTemplate"
+  description: "Descripción breve del propósito de este Gem."
+  version: "0.1.0"
+  author: "Ricardo Masabel"
+
+behavior:
+  tone_and_style: "Técnico, directo y conciso."
+
+tools:
+  default_tool: "none"
+  extensions: []
+
+knowledge_base:
+  attached_files: []
