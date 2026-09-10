@@ -1,0 +1,54 @@
+name: Continuous Integration - Lint & Compile Gems
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'gems/**'
+      - 'schemas/**'
+      - 'scripts/**'
+      - 'requirements.txt'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-and-build:
+    name: Validate Schema & Build Manifests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate and build all active Gems
+        run: |
+          mkdir -p dist
+          for gem_dir in gems/*/; do
+            # Omitir template boilerplate de compilación directa
+            if [ "$(basename "$gem_dir")" = "_template" ]; then
+              echo "Saltando boilerplate template: $gem_dir"
+              continue
+            fi
+
+            if [ -f "${gem_dir}meta.yaml" ]; then
+              echo "==> Compilando Gem: $gem_dir"
+              python scripts/build-gem.py "$gem_dir"
+            fi
+          done
+
+      - name: Upload compiled JSON artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-gem-manifests
+          path: dist/*.json
+          if-no-files-found: error
+          retention-days: 7
