@@ -40,16 +40,25 @@ def build_gem(gem_dir_path: str, schema_path: str = "schemas/gem-configuration.s
         gem_data["behavior"] = {}
 
     with open(instructions_file, "r", encoding="utf-8") as f:
-        gem_data["behavior"]["instructions"] = f.read().strip()
+        base_instructions = f.read().strip()
 
     if tone_file.exists():
         with open(tone_file, "r", encoding="utf-8") as f:
             gem_data["behavior"]["tone_and_style"] = f.read().strip()
 
-    # 3. Empaquetar bajo el nodo raíz exigido por el schema
+    # 3. Concatenar tone_and_style en instructions para inyección efectiva en la UI
+    tone_and_style = gem_data["behavior"].get("tone_and_style", "").strip()
+    if tone_and_style:
+        gem_data["behavior"]["instructions"] = (
+            f"{base_instructions}\n\n---\n\n### TONO Y ESTILO OPERATIVO\n{tone_and_style}"
+        )
+    else:
+        gem_data["behavior"]["instructions"] = base_instructions
+
+    # 4. Empaquetar bajo el nodo raíz exigido por el schema
     payload = {"gem_configuration": gem_data}
 
-    # 4. Validar contra GemConfigurationSchema
+    # 5. Validar contra GemConfigurationSchema
     if not schema_file.exists():
         print(f"[ERROR] No se encontró el esquema en: {schema_file}")
         sys.exit(1)
@@ -66,7 +75,7 @@ def build_gem(gem_dir_path: str, schema_path: str = "schemas/gem-configuration.s
         print(f" -> Ruta del campo: {' -> '.join([str(p) for p in err.absolute_path])}")
         sys.exit(1)
 
-    # 5. Generar archivo JSON compilado en dist/
+    # 6. Generar archivo JSON compilado en dist/
     dist_dir = Path("dist").resolve()
     dist_dir.mkdir(exist_ok=True)
     out_file = dist_dir / f"{gem_dir.name}.json"
