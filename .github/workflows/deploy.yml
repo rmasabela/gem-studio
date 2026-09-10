@@ -1,14 +1,12 @@
 name: Continuous Delivery - Publish Gems to Pages
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'gems/**'
-      - 'schemas/**'
-      - 'scripts/**'
-      - '.github/workflows/deploy.yml'
-      - 'requirements.txt'
+  workflow_run:
+    workflows: ["Continuous Integration - Lint & Compile Gems"]
+    types:
+      - completed
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -23,6 +21,8 @@ concurrency:
 jobs:
   build-and-deploy:
     name: Build Manifests & Deploy to GitHub Pages
+    # Condición estricta: solo desplegar si el workflow de CI concluyó exitosamente
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -44,7 +44,6 @@ jobs:
       - name: Compile Gems and generate index catalog
         run: |
           mkdir -p dist
-          catalog="[]"
 
           for gem_dir in gems/*/; do
             if [ "$(basename "$gem_dir")" = "_template" ]; then
