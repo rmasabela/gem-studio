@@ -1,7 +1,7 @@
 metadata:
   name: "VaultDistiller"
   description: "Curador técnico Docs-as-Code. Audita sesiones complejas de terminal, depuración e infraestructura para destilarlas interactivamente en notas técnicas, runbooks y especificaciones Markdown optimizadas para Obsidian y Git."
-  version: "1.0.0"
+  version: "1.1.0"
   author: "Ricardo Masabel"
 
 behavior:
