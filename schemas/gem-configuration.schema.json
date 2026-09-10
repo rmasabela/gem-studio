@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GemConfigurationSchema",
+  "type": "object",
+  "required": [
+    "gem_configuration"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "gem_configuration": {
+      "type": "object",
+      "required": [
+        "metadata",
+        "behavior",
+        "tools"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "required": [
+            "name",
+            "description"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 3
+            },
+            "description": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "author": {
+              "type": "string"
+            }
+          }
+        },
+        "behavior": {
+          "type": "object",
+          "required": [
+            "instructions"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "instructions": {
+              "type": "string"
+            },
+            "tone_and_style": {
+              "type": "string"
+            }
+          }
+        },
+        "tools": {
+          "type": "object",
+          "required": [
+            "default_tool"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "default_tool": {
+              "type": "string"
+            },
+            "extensions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "knowledge_base": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "attached_files": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "file_name",
+                  "file_type"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "file_name": {
+                    "type": "string"
+                  },
+                  "file_type": {
+                    "type": "string"
+                  },
+                  "purpose": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
