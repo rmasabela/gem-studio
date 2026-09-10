@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GemStudio Sync for Gemini
 // @namespace    https://github.com/rmasabela/gem-studio
-// @version      1.0.2
+// @version      1.0.3
 // @description  Sincroniza y despliega configuraciones de Gems desde GitHub Pages directo a la UI de Gemini
 // @author       Ricardo Masabel
 // @match        https://gemini.google.com/*
@@ -18,8 +18,7 @@
     function setNativeValue(element, value) {
         if (!element) return;
         element.focus();
-        
-        // Manejo para inputs/textareas que pueden tener value setters interceptados por Angular/React
+
         const valueSetter = Object.getOwnPropertyDescriptor(element, 'value')?.set;
         const prototype = Object.getPrototypeOf(element);
         const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
@@ -40,34 +39,36 @@
 
     function locateGemFields() {
         const textareas = Array.from(document.querySelectorAll('textarea'));
-        const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+        const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"])'));
 
-        // 1. Campo Nombre
-        let nameField = inputs.find(i => {
-            const label = (i.getAttribute('aria-label') || i.getAttribute('placeholder') || '').toLowerCase();
-            return label.includes('nombre') || label.includes('name');
+        // 1. Nombre: Input con placeholder o label correspondiente
+        let nameField = inputs.find(el => {
+            const str = (el.placeholder + ' ' + el.getAttribute('aria-label') + ' ' + el.name).toLowerCase();
+            return str.includes('nombre') || str.includes('name') || str.includes('asigna un nombre');
         }) || inputs[0];
 
-        // 2. Campo Descripción
-        let descField = inputs.find(i => {
-            const label = (i.getAttribute('aria-label') || i.getAttribute('placeholder') || '').toLowerCase();
-            return label.includes('descrip');
-        }) || textareas.find(t => {
-            const label = (t.getAttribute('aria-label') || t.getAttribute('placeholder') || '').toLowerCase();
-            return label.includes('descrip');
+        // 2. Descripción: Textarea con placeholder específico o primer textarea
+        let descField = textareas.find(el => {
+            const str = (el.placeholder + ' ' + el.getAttribute('aria-label')).toLowerCase();
+            return str.includes('describe tu gem') || str.includes('descrip');
         });
 
-        // 3. Campo Instrucciones (usualmente el textarea principal o más grande)
-        let instField = textareas.find(t => {
-            const label = (t.getAttribute('aria-label') || t.getAttribute('placeholder') || '').toLowerCase();
-            return label.includes('instrucc') || label.includes('instruction');
-        }) || textareas[textareas.length - 1];
+        // 3. Instrucciones: Textarea cuyo placeholder contiene 'ejemplo:' o 'horticultor', o el textarea más extenso
+        let instField = textareas.find(el => {
+            const str = (el.placeholder + ' ' + el.getAttribute('aria-label')).toLowerCase();
+            return str.includes('ejemplo:') || str.includes('horticultor') || str.includes('instrucc') || str.includes('instruction');
+        });
+
+        // Fallback estructural si Google cambia los placeholders pero mantiene el orden vertical
+        if (textareas.length >= 2) {
+            if (!descField) descField = textareas[0];
+            if (!instField) instField = textareas[1];
+        }
 
         return { nameField, descField, instField };
     }
 
     function renderSyncBar() {
-        // Inyectar solo si estamos en la vista de edición/creación de un Gem
         const isEditView = window.location.pathname.includes('/gems/edit/') || 
                            window.location.pathname.includes('/gems/create') ||
                            window.location.href.includes('/gems/');
@@ -117,7 +118,6 @@
         const selectEl = document.getElementById('gem-studio-select');
         const syncBtn = document.getElementById('gem-studio-btn-sync');
 
-        // Cargar catálogo de GitHub Pages
         GM_xmlhttpRequest({
             method: "GET",
             url: `${BASE_URL}/index.json`,
