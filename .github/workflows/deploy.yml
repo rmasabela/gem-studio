@@ -1,0 +1,85 @@
+name: Continuous Delivery - Publish Gems to Pages
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'gems/**'
+      - 'schemas/**'
+      - 'scripts/**'
+      - '.github/workflows/deploy.yml'
+      - 'requirements.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    name: Build Manifests & Deploy to GitHub Pages
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python runtime
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Compile Gems and generate index catalog
+        run: |
+          mkdir -p dist
+          catalog="[]"
+
+          for gem_dir in gems/*/; do
+            if [ "$(basename "$gem_dir")" = "_template" ]; then
+              continue
+            fi
+
+            if [ -f "${gem_dir}meta.yaml" ]; then
+              gem_slug="$(basename "$gem_dir")"
+              echo "==> Compilando para release: $gem_slug"
+              python scripts/build-gem.py "$gem_dir"
+            fi
+          done
+
+          # Generar catálogo centralizado index.json para descubrimiento
+          python -c '
+          import json, glob, os
+          manifests = []
+          for f in sorted(glob.glob("dist/*.json")):
+              with open(f, "r", encoding="utf-8") as fp:
+                  data = json.load(fp)["gem_configuration"]
+                  manifests.append({
+                      "slug": os.path.splitext(os.path.basename(f))[0],
+                      "name": data["metadata"]["name"],
+                      "version": data["metadata"].get("version", "unknown"),
+                      "description": data["metadata"]["description"]
+                  })
+          with open("dist/index.json", "w", encoding="utf-8") as out:
+              json.dump(manifests, out, indent=2, ensure_ascii=False)
+          '
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
