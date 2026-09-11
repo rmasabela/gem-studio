@@ -22,14 +22,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python runtime
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
       - name: Validate and build all active Gems
         run: |
@@ -43,7 +37,7 @@ jobs:
 
             if [ -f "${gem_dir}meta.yaml" ]; then
               echo "==> Compilando Gem: $gem_dir"
-              python scripts/build-gem.py "$gem_dir"
+              python3 scripts/build-gem.py "$gem_dir"
             fi
           done
 
