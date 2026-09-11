@@ -16,7 +16,7 @@ on:
 jobs:
   validate-and-build:
     name: Validate Schema & Build Manifests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, docker, gem-studio]
 
     steps:
       - name: Checkout repository
