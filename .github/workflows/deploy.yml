@@ -32,14 +32,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python runtime
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
       - name: Compile Gems and generate index catalog
         run: |
@@ -53,12 +47,12 @@ jobs:
             if [ -f "${gem_dir}meta.yaml" ]; then
               gem_slug="$(basename "$gem_dir")"
               echo "==> Compilando para release: $gem_slug"
-              python scripts/build-gem.py "$gem_dir"
+              python3 scripts/build-gem.py "$gem_dir"
             fi
           done
 
           # Generar catálogo centralizado index.json para descubrimiento
-          python -c '
+          python3 -c '
           import json, glob, os
           manifests = []
           for f in sorted(glob.glob("dist/*.json")):
