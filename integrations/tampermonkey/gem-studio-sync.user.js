@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         GemStudio Sync for Gemini
 // @namespace    https://github.com/rmasabela/gem-studio
-// @version      1.0.4
+// @version      1.0.5
 // @description  Sincroniza y despliega configuraciones de Gems desde GitHub Pages directo a la UI de Gemini
 // @author       Ricardo Masabel
 // @match        https://gemini.google.com/*
@@ -100,6 +100,7 @@
             return;
         }
 
+        // Construcción segura del DOM sin innerHTML (TrustedHTML CSP Compliance)
         const bar = document.createElement('div');
         bar.id = 'gem-studio-sync-bar';
         bar.style.cssText = `
@@ -118,21 +119,30 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
         `;
 
-        bar.innerHTML = `
-            <span style="color: #8ab4f8; font-weight: 600; font-size: 11px; letter-spacing: 0.5px;">GEM-STUDIO</span>
-            <select id="gem-studio-select" style="background: #202124; color: #e8eaed; border: 1px solid #5f6368; border-radius: 4px; padding: 4px 6px; font-size: 11px; outline: none;">
-                <option value="">Cargando catálogo...</option>
-            </select>
-            <button id="gem-studio-btn-sync" style="background: #1a73e8; color: white; border: none; border-radius: 4px; padding: 5px 10px; font-size: 11px; font-weight: 500; cursor: pointer;">
-                Deploy to UI
-            </button>
-        `;
+        const label = document.createElement('span');
+        label.textContent = 'GEM-STUDIO';
+        label.style.cssText = 'color: #8ab4f8; font-weight: 600; font-size: 11px; letter-spacing: 0.5px;';
+        bar.appendChild(label);
+
+        const selectEl = document.createElement('select');
+        selectEl.id = 'gem-studio-select';
+        selectEl.style.cssText = 'background: #202124; color: #e8eaed; border: 1px solid #5f6368; border-radius: 4px; padding: 4px 6px; font-size: 11px; outline: none;';
+        
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = 'Cargando catálogo...';
+        selectEl.appendChild(defaultOpt);
+        bar.appendChild(selectEl);
+
+        const syncBtn = document.createElement('button');
+        syncBtn.id = 'gem-studio-btn-sync';
+        syncBtn.textContent = 'Deploy to UI';
+        syncBtn.style.cssText = 'background: #1a73e8; color: white; border: none; border-radius: 4px; padding: 5px 10px; font-size: 11px; font-weight: 500; cursor: pointer;';
+        bar.appendChild(syncBtn);
 
         document.body.appendChild(bar);
 
-        const selectEl = document.getElementById('gem-studio-select');
-        const syncBtn = document.getElementById('gem-studio-btn-sync');
-
+        // Cargar catálogo de GitHub Pages evitando innerHTML
         GM_xmlhttpRequest({
             method: "GET",
             url: `${BASE_URL}/index.json`,
@@ -140,12 +150,26 @@
                 if (res.status === 200) {
                     try {
                         const gems = JSON.parse(res.responseText);
-                        selectEl.innerHTML = gems.map(g => `<option value="${g.slug}">${g.name} (v${g.version})</option>`).join('');
+                        selectEl.textContent = '';
+                        gems.forEach(g => {
+                            const opt = document.createElement('option');
+                            opt.value = g.slug;
+                            opt.textContent = `${g.name} (v${g.version})`;
+                            selectEl.appendChild(opt);
+                        });
                     } catch(e) {
-                        selectEl.innerHTML = '<option value="">Error JSON</option>';
+                        selectEl.textContent = '';
+                        const errOpt = document.createElement('option');
+                        errOpt.value = '';
+                        errOpt.textContent = 'Error JSON';
+                        selectEl.appendChild(errOpt);
                     }
                 } else {
-                    selectEl.innerHTML = '<option value="">Error ' + res.status + '</option>';
+                    selectEl.textContent = '';
+                    const errOpt = document.createElement('option');
+                    errOpt.value = '';
+                    errOpt.textContent = `Error ${res.status}`;
+                    selectEl.appendChild(errOpt);
                 }
             }
         });
@@ -154,7 +178,7 @@
             const slug = selectEl.value;
             if (!slug) return alert('Selecciona un Gem.');
 
-            syncBtn.innerText = 'Descargando...';
+            syncBtn.textContent = 'Descargando...';
             syncBtn.style.background = '#e37400';
 
             GM_xmlhttpRequest({
@@ -162,7 +186,7 @@
                 url: `${BASE_URL}/${slug}.json`,
                 onload: function(res) {
                     if (res.status !== 200) {
-                        syncBtn.innerText = 'Error';
+                        syncBtn.textContent = 'Error';
                         syncBtn.style.background = '#d93025';
                         return alert(`HTTP Error ${res.status}`);
                     }
@@ -183,15 +207,15 @@
                             setFieldValue(instField, config.behavior.instructions);
                         }
 
-                        syncBtn.innerText = '¡Desplegado!';
+                        syncBtn.textContent = '¡Desplegado!';
                         syncBtn.style.background = '#1e8e3e';
                         setTimeout(() => {
-                            syncBtn.innerText = 'Deploy to UI';
+                            syncBtn.textContent = 'Deploy to UI';
                             syncBtn.style.background = '#1a73e8';
                         }, 2500);
 
                     } catch (err) {
-                        syncBtn.innerText = 'Error';
+                        syncBtn.textContent = 'Error';
                         syncBtn.style.background = '#d93025';
                         alert('Error aplicando datos: ' + err.message);
                     }
