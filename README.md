@@ -154,10 +154,10 @@ pip install -r requirements.txt
 
 1. Scaffold from template:
 
-```bash
-cp -r gems/_template gems/my-new-gem
-
-```
+   ```bash
+   cp -r gems/_template gems/my-new-gem
+   
+   ```
 
 2. Configure parameters in `gems/my-new-gem/meta.yaml`.
 
@@ -165,10 +165,10 @@ cp -r gems/_template gems/my-new-gem
    
 4. Validate and build locally:
    
-```bash
-python scripts/build-gem.py gems/my-new-gem
-
-```
+   ```bash
+   python scripts/build-gem.py gems/my-new-gem
+   
+   ```
 
 ---
 
