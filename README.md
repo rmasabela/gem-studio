@@ -58,14 +58,14 @@ gem-studio/
 
 Every Gem must strictly adhere to the `GemConfigurationSchema`:
 
-* **`metadata`**: `name`, `description`, `version` (SemVer), and `author` (`Ricardo Masabel`).
+* **`metadata`**: `name`, `description`, `version` (SemVer), and `author` (Ricardo Masabel).
 * **`behavior`**: `instructions` (compiled system prompt) and `tone_and_style`.
 * **`tools`**: `default_tool` (e.g., `none`, `web_search`) and active `extensions`.
 * **`knowledge_base`**: Declarative inventory of grounding documentation and reference assets.
 
 ### 2. Modular Gem Structure
 
-Each assistant lives in its own directory under `gems/<gem-slug>/`:
+Each assistant lives in its own directory under `gems/{gem-slug}/`:
 
 * **`meta.yaml`**: Pure metadata and operational parameters decoupled from prompt prose.
 * **`instructions.md`**: The master prompt containing behavioral guardrails, workflow stages, and output formatting schemas.
@@ -76,7 +76,7 @@ Merges `meta.yaml` and `instructions.md`, validates the assembled payload agains
 
 ```bash
 # Activate your virtual environment
-source .venv/bin/activate  # Or: .\.venv\Scripts\Activate.ps1 on Windows
+source .venv/bin/activate  # Or: Activate.ps1 on Windows
 
 # Validate and compile a Gem
 python scripts/build-gem.py gems/vault-distiller
@@ -90,21 +90,29 @@ python scripts/build-gem.py gems/vault-distiller
 ```mermaid
 flowchart TD
     subgraph LocalDev["1. Local Authoring & Build"]
-        A["gems/&lt;slug&gt;/<br/>• meta.yaml<br/>• instructions.md"] --> B["scripts/build-gem.py"]
+        A["gems/{gem-slug}/<br/>• meta.yaml<br/>• instructions.md"] --> B["scripts/build-gem.py"]
         S["schemas/gem-configuration.schema.json<br/>(Draft 2020-12)"] -->|Contract validation| B
-        B --> C["dist/&lt;slug&gt;.json"]
+        B --> C["dist/{gem-slug}.json"]
     end
 
     subgraph GitHubActions["2. Automated CI/CD Engine"]
-        C -.->|Push to main| CI["CI Workflow (ci.yml)<br/>Syntax check & schema audit"]
-        CI -->|workflow_run: success| CD["CD Workflow (deploy.yml)<br/>Aggregate catalog (index.json)"]
-        CD --> Pages["GitHub Pages<br/>Static API distribution"]
+        CI["CI Workflow (ci.yml)<br/>Syntax check & schema audit"]
+        CD["CD Workflow (deploy.yml)<br/>Aggregate catalog (index.json)"]
+        Pages["GitHub Pages<br/>Static REST API distribution"]
+
+        CI -->|workflow_run: success| CD
+        CD -->|Deploy Pages artifact| Pages
     end
 
     subgraph LastMile["3. Last-Mile Web UI Deployment"]
-        Pages -->|Fetch index & manifests| TM["Tampermonkey Userscript<br/>(gem-studio-sync.user.js)"]
-        TM -->|Synthetic InputEvents & text insertion| UI["Google Gemini Web Interface<br/>(Reactive form hydration)"]
+        TM["Tampermonkey Userscript<br/>(gem-studio-sync.user.js)"]
+        UI["Google Gemini Web Interface<br/>(Reactive form hydration)"]
+
+        TM -->|DOM Event Dispatch<br/>InputEvent & execCommand| UI
     end
+
+    C -.->|Push to main| CI
+    Pages -->|Fetch index & manifests| TM
 ```
 
 ### CI/CD Pipeline
