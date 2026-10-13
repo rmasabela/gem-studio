@@ -89,30 +89,57 @@ python scripts/build-gem.py gems/vault-distiller
 
 ```mermaid
 flowchart TD
-    subgraph LocalDev["1. Local Authoring & Build"]
-        A["gems/{gem-slug}/<br/>• meta.yaml<br/>• instructions.md"] --> B["scripts/build-gem.py"]
-        S["schemas/gem-configuration.schema.json<br/>(Draft 2020-12)"] -->|Contract validation| B
-        B --> C["dist/{gem-slug}.json"]
+    %% =========================================================
+    %% 1. Local Stage (Horizontal row)
+    %% =========================================================
+    subgraph S1 ["1. Local Authoring & Validation"]
+        direction LR
+        A["gems/{gem-slug}/<br/>• meta.yaml<br/>• instructions.md"]
+        S["schemas/gem-configuration.schema.json<br/>(Draft 2020-12)"]
+        B["scripts/build-gem.py<br/>(Local Compiler & Validator)"]
+        C["dist/{gem-slug}.json<br/>(Immutable Release Manifest)"]
+
+        A --> B
+        S -->|Validates against| B
+        B --> C
     end
 
-    subgraph GitHubActions["2. Automated CI/CD Engine"]
-        CI["CI Workflow (ci.yml)<br/>Syntax check & schema audit"]
-        CD["CD Workflow (deploy.yml)<br/>Aggregate catalog (index.json)"]
-        Pages["GitHub Pages<br/>Static REST API distribution"]
+    %% =========================================================
+    %% 2. CI/CD Stage (Horizontal row)
+    %% =========================================================
+    subgraph S2 ["2. Automated CI/CD Engine"]
+        direction LR
+        CI["CI Workflow (ci.yml)<br/>Schema verification & lint"]
+        CD["CD Workflow (deploy.yml)<br/>Master catalog compilation"]
+        Pages["GitHub Pages CDN<br/>(Static REST API index.json)"]
 
         CI -->|workflow_run: success| CD
-        CD -->|Deploy Pages artifact| Pages
+        CD -->|Deploys bundle| Pages
     end
 
-    subgraph LastMile["3. Last-Mile Web UI Deployment"]
+    %% =========================================================
+    %% 3. Last-Mile Stage (Horizontal row)
+    %% =========================================================
+    subgraph S3 ["3. Last-Mile Browser Deployment"]
+        direction LR
         TM["Tampermonkey Userscript<br/>(gem-studio-sync.user.js)"]
-        UI["Google Gemini Web Interface<br/>(Reactive form hydration)"]
+        UI["Google Gemini Web Interface<br/>(Reactive DOM Hydration)"]
 
         TM -->|DOM Event Dispatch<br/>InputEvent & execCommand| UI
     end
 
-    C -.->|Push to main| CI
-    Pages -->|Fetch index & manifests| TM
+    %% =========================================================
+    %% Inter-stage Triggers (Conexiones verticales entre bloques)
+    %% =========================================================
+    S1 -->|git push origin main| S2
+    S2 -->|GM_xmlhttpRequest catalog fetch| S3
+
+    %% Styling
+    classDef stage fill:#1e1e2e,stroke:#89b4fa,stroke-width:1.5px,color:#cdd6f4;
+    classDef step fill:#181825,stroke:#45475a,stroke-width:1px,color:#cdd6f4;
+    class S1,S2,S3 stage;
+    class A,S,B,C,CI,CD,Pages,TM,UI step;
+
 ```
 
 ### CI/CD Pipeline
